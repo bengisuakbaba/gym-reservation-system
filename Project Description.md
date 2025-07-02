@@ -18,7 +18,7 @@ The goal is to make gym equipment usage more efficient, enable members to make r
 https://github.com/user-attachments/assets/2ca14cad-afd2-4637-bed7-cd0814385dab
 
 
-### 🧑‍💻 Admin Panel-Equipment Statistics Screen 
+### Admin Panel-Equipment Statistics Screen 
 https://github.com/user-attachments/assets/f01093cc-0f1e-4ac0-9282-e4db734d08ad
 
 For more screenshots, you can check my thesis document.
