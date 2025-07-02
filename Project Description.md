@@ -30,7 +30,6 @@ You can access the detailed thesis report for the project at the link below:
 https://github.com/bengisuakbaba/gym-reservation-system/blob/main/Web-Based%20Gym%20Equipment%20Rezevation%20%26%20Management%20System%20-Bengisu%20Akbaba.pdf
 
 
-
 ## Technologies Used
 
 - Python 3  
