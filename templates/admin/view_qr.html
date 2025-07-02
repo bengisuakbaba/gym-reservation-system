@@ -1,0 +1,154 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="view-qr-container">
+    <h1>Equipment QR Code</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="qr-card">
+        <div class="equipment-info">
+            <h2>{{ equipment.name }}</h2>
+            <p><strong>QR Code ID:</strong> {{ equipment.qr_code }}</p>
+            <p><strong>Status:</strong>
+                <span class="status-badge {% if equipment.is_available %}available{% else %}in-use{% endif %}">
+                    {% if equipment.is_available %}Available{% else %}In Use{% endif %}
+                </span>
+            </p>
+        </div>
+
+        <div class="qr-code-container">
+            <div class="qr-image">
+                <img src="{{ url_for('static', filename='qrcodes/' + qr_filename) }}"
+                     alt="QR Code for {{ equipment.name }}"
+                     onerror="this.style.display='none'; document.getElementById('error-message').style.display='block';">
+                <div id="error-message" style="display: none; color: red; text-align: center;">
+                    QR Code image not found. Path: /static/qrcodes/{{ qr_filename }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="back-buttons">
+        <a href="{{ url_for('admin.edit_equipment', equipment_id=equipment.id) }}" class="btn-secondary">Edit Equipment</a>
+        <a href="{{ url_for('admin.manage_equipment') }}" class="btn-secondary">Back to Equipment List</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block additional_styles %}
+<style>
+    .view-qr-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .view-qr-container h1 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: var(--secondary-color);
+    }
+
+    .qr-card {
+        background-color: white;
+        border-radius: 6px;
+        padding: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+
+    .equipment-info {
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 15px;
+        margin-bottom: 20px;
+    }
+
+    .equipment-info h2 {
+        color: var(--secondary-color);
+        margin-bottom: 10px;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+
+    .status-badge.available {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge.in-use {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .qr-code-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .qr-image {
+        margin-bottom: 20px;
+    }
+
+    .qr-image img {
+        max-width: 250px;
+        height: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        background-color: white;
+    }
+
+    .back-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: none;
+        text-decoration: none;
+        display: inline-block;
+        cursor: pointer;
+        color: white;
+        background-color: #6c757d;
+    }
+
+    @media print {
+        .back-buttons, header {
+            display: none;
+        }
+
+        .view-qr-container {
+            padding: 0;
+        }
+
+        .qr-card {
+            box-shadow: none;
+            border: none;
+        }
+
+        .qr-image img {
+            width: 100%;
+            max-width: 100%;
+        }
+    }
+</style>
+{% endblock %}

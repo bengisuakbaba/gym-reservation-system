@@ -1,0 +1,181 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="admin-presence-container">
+    <h1>Current Gym Presence</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="presence-stats">
+        <div class="stat-card">
+            <div class="stat-title">Current Users</div>
+            <div class="stat-value">{{ presences|length }}</div>
+            <div class="stat-info">Students currently in the gym</div>
+        </div>
+    </div>
+
+    <div class="presence-table-container">
+        <table class="presence-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Student ID</th>
+                    <th>Check-in Time</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for presence in presences %}
+                    <tr>
+                        <td>{{ presence.id }}</td>
+                        <td>
+                            {% if presence.user_id in users %}
+                                {{ users[presence.user_id].first_name }} {{ users[presence.user_id].last_name }}
+                            {% else %}
+                                Unknown User
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if presence.user_id in users %}
+                                {{ users[presence.user_id].get_student_id() }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </td>
+                        <td>{{ presence.check_in_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            {% set duration_seconds = (now - presence.check_in_time).total_seconds() %}
+                            {% set hours = (duration_seconds // 3600)|int %}
+                            {% set minutes = ((duration_seconds % 3600) // 60)|int %}
+
+                            {% if hours > 0 %}
+                                {{ hours }} hr {{ minutes }} min
+                            {% else %}
+                                {{ minutes }} min
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="no-data">No users currently present in the gym.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="back-link">
+        <a href="{{ url_for('admin.admin_dashboard') }}">Back to Admin Dashboard</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block additional_styles %}
+<style>
+    .admin-presence-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .admin-presence-container h1 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: var(--secondary-color);
+    }
+
+    .presence-stats {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background-color: white;
+        border-radius: 6px;
+        padding: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        text-align: center;
+        min-width: 200px;
+    }
+
+    .stat-title {
+        font-size: 1.1rem;
+        color: #555;
+        margin-bottom: 10px;
+    }
+
+    .stat-value {
+        font-size: 3rem;
+        font-weight: bold;
+        color: var(--secondary-color);
+        margin-bottom: 10px;
+    }
+
+    .stat-info {
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .presence-table-container {
+        background-color: white;
+        border-radius: 6px;
+        padding: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        overflow-x: auto;
+        margin-bottom: 20px;
+    }
+
+    .presence-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .presence-table th {
+        background-color: #f5f5f5;
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 2px solid #ddd;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .presence-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .presence-table tbody tr:hover {
+        background-color: #f9f9f9;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 20px !important;
+        color: #666;
+    }
+
+    .back-link {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .back-link a {
+        color: var(--secondary-color);
+        text-decoration: none;
+    }
+
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}

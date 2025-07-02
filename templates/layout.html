@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Işık Üniversitesi Gym Center</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    {% block additional_styles %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <header class="main-header">
+        <div class="container">
+            <div class="logo">
+                <a href="{{ url_for('main.dashboard') }}">Işık Üniversitesi Gym Center</a>
+            </div>
+            <nav class="main-nav">
+                {% if current_user.is_authenticated %}
+                    <ul class="nav-links">
+                        <li><a href="{{ url_for('main.dashboard') }}" class="nav-link"><i class="fas fa-home"></i> Dashboard</a></li>
+                        <li><a href="{{ url_for('gym.my_reservations') }}" class="nav-link"><i class="fas fa-calendar-check"></i> My Reservations</a></li>
+                        <li><a href="{{ url_for('gym.equipment_list') }}" class="nav-link"><i class="fas fa-dumbbell"></i> Equipment</a></li>
+                        {% if current_user.is_admin %}
+                            <li class="dropdown">
+                                <a href="#" class="nav-link dropdown-toggle"><i class="fas fa-user-shield"></i> Admin Panel</a>
+                                <ul class="dropdown-menu">
+                                    <li><a href="{{ url_for('admin.admin_dashboard') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+                                    <li><a href="{{ url_for('admin.manage_equipment') }}"><i class="fas fa-dumbbell"></i> Equipment</a></li>
+                                    <li><a href="{{ url_for('admin.equipment_analytics') }}"><i class="fas fa-chart-line"></i> Analytics</a></li>
+                                    <li><a href="{{ url_for('admin.manage_reservations') }}"><i class="fas fa-calendar-check"></i> Reservations</a></li>
+                                    <li><a href="{{ url_for('admin.manage_users') }}"><i class="fas fa-users"></i> Users</a></li>
+                                    <li><a href="{{ url_for('admin.view_presence') }}"><i class="fas fa-eye"></i> Presence</a></li>
+                                </ul>
+                            </li>
+                        {% endif %}
+                        <li><a href="{{ url_for('auth.logout') }}" class="nav-link"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                        <li class="user-info"><i class="fas fa-user"></i> {{ current_user.first_name }}</li>
+                    </ul>
+                {% else %}
+                    <ul class="nav-links">
+                        <li><a href="{{ url_for('auth.login') }}" class="nav-link"><i class="fas fa-sign-in-alt"></i> Login</a></li>
+                        <li><a href="{{ url_for('auth.register') }}" class="nav-link"><i class="fas fa-user-plus"></i> Register</a></li>
+                    </ul>
+                {% endif %}
+            </nav>
+            <button class="mobile-toggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+
+    {% if current_user.is_authenticated %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let globalReservations = {{ global_user_reservations | tojson }};
+
+            if (globalReservations && globalReservations.length > 0) {
+                startReservationMonitoring(globalReservations);
+            }
+
+            setInterval(function() {
+                fetch('/api/user-reservations')
+                    .then(response => response.json())
+                    .then(reservations => {
+                        if (reservations && reservations.length > 0) {
+                            startReservationMonitoring(reservations);
+                        } else {
+                            stopReservationMonitoring();
+                        }
+                    })
+                    .catch(error => {
+                        console.log('Error fetching reservations:', error);
+                    });
+            }, 60000);
+
+            window.addEventListener('beforeunload', function() {
+                stopReservationMonitoring();
+            });
+        });
+    </script>
+    {% endif %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

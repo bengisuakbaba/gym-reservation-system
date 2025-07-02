@@ -1,0 +1,224 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h1 class="page-title">Equipment Details</h1>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="card">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2 class="card-title">{{ equipment.name }}</h2>
+            <span class="badge {% if equipment.is_available %}badge-success{% else %}badge-danger{% endif %}">
+                {% if equipment.is_available %}Available{% else %}In Use{% endif %}
+            </span>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if not equipment.is_available and current_reservation %}
+            <div class="bg-light p-3 mb-4 rounded">
+                <h3 class="mb-3 text-primary">Current Usage</h3>
+                <div class="d-flex justify-content-between mb-2">
+                    <p><i class="far fa-clock"></i> <strong>In use until:</strong></p>
+                    <p>{{ current_reservation.end_time.strftime('%H:%M') }}</p>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <p><i class="fas fa-hourglass-half"></i> <strong>Time remaining:</strong></p>
+                    {% if now < current_reservation.end_time %}
+                        {% set remaining_seconds = (current_reservation.end_time - now).total_seconds() %}
+                        {% set remaining_minutes = (remaining_seconds / 60)|int %}
+                        <p><span class="time-remaining" data-end-time="{{ current_reservation.end_time.isoformat() }}">{{ remaining_minutes }} minutes</span></p>
+                    {% else %}
+                        <p><span class="time-remaining" data-end-time="{{ current_reservation.end_time.isoformat() }}">0 minutes</span></p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if queue and queue|length > 0 %}
+            <div class="bg-light p-3 mb-4 rounded">
+                <h3 class="mb-3 text-primary">Queue Information</h3>
+                <p>There are {{ queue|length }} people in line for this equipment.</p>
+                <div class="table-container">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for reservation in queue %}
+                                <tr {% if reservation.user_id == current_user.id %}class="bg-light"{% endif %}>
+                                    <td>{{ reservation.queue_position }}</td>
+                                    <td>{{ reservation.start_time.strftime('%H:%M') }}</td>
+                                    <td>{{ reservation.end_time.strftime('%H:%M') }}</td>
+                                    <td>{{ reservation.duration_minutes }} min</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if user_reservation %}
+            <div class="bg-light p-3 mb-4 rounded">
+                <h3 class="mb-3 text-primary">Your Reservation</h3>
+                <div class="d-flex justify-content-between mb-2">
+                    <p><strong>Status:</strong></p>
+                    <p>
+                        {% if user_reservation.queue_position == 0 %}
+                            <span class="badge badge-success">Currently using</span>
+                        {% else %}
+                            <span class="badge badge-warning">In queue (position {{ user_reservation.queue_position }})</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <p><strong>Start time:</strong></p>
+                    <p>{{ user_reservation.start_time.strftime('%H:%M') }}</p>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <p><strong>End time:</strong></p>
+                    <p>{{ user_reservation.end_time.strftime('%H:%M') }}</p>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <p><strong>Duration:</strong></p>
+                    <p>{{ user_reservation.duration_minutes }} minutes</p>
+                </div>
+
+                {% if user_reservation.queue_position == 0 %}
+                    <div class="d-flex justify-content-between mb-3">
+                        <p><strong>Time remaining:</strong></p>
+                        {% if now < user_reservation.end_time %}
+                            {% set remaining_seconds = (user_reservation.end_time - now).total_seconds() %}
+                            {% set remaining_minutes = (remaining_seconds / 60)|int %}
+                            <p><span class="time-remaining" data-end-time="{{ user_reservation.end_time.isoformat() }}">{{ remaining_minutes }} minutes</span></p>
+                        {% else %}
+                            <p><span class="time-remaining" data-end-time="{{ user_reservation.end_time.isoformat() }}">0 minutes</span></p>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-between flex-wrap gap-2">
+                    <form action="{{ url_for('gym.cancel_reservation', reservation_id=user_reservation.id) }}" method="POST">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-times mr-1"></i> Cancel Reservation
+                        </button>
+                    </form>
+
+                    {% if user_reservation.queue_position == 0 %}
+                        <form action="{{ url_for('gym.update_reservation', reservation_id=user_reservation.id) }}" method="POST" class="d-flex gap-2">
+                            <div class="form-group mb-0">
+                                <label for="duration" class="form-label mb-0 mr-2">Decrease Duration:</label>
+                                <input type="number" name="duration" id="duration" min="5" max="{{ user_reservation.duration_minutes }}"
+                                       value="{{ user_reservation.duration_minutes }}" required class="form-control">
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-sync-alt mr-1"></i> Update
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            {% if equipment.is_available %}
+                <div class="bg-light p-3 mb-4 rounded">
+                    <h3 class="mb-3 text-primary">Reserve This Equipment</h3>
+                    <form action="{{ url_for('gym.reserve_equipment', equipment_id=equipment.id) }}" method="POST">
+                        <div class="form-group">
+                            <label for="duration" class="form-label">Duration (minutes):</label>
+                            <input type="number" name="duration" id="duration" min="5" max="120" value="30" required class="form-control">
+                            <small class="form-hint">Select how long you need the equipment (5-120 minutes)</small>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check mr-1"></i> Reserve Now
+                        </button>
+                    </form>
+                </div>
+            {% elif not user_reservation %}
+                <div class="bg-light p-3 mb-4 rounded">
+                    <h3 class="mb-3 text-primary">Join Queue</h3>
+                    <form action="{{ url_for('gym.reserve_equipment', equipment_id=equipment.id) }}" method="POST">
+                        <div class="form-group">
+                            <label for="duration" class="form-label">Duration (minutes):</label>
+                            <input type="number" name="duration" id="duration" min="5" max="120" value="30" required class="form-control">
+                            <small class="form-hint">Select how long you'll need the equipment (5-120 minutes)</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-users mr-1"></i> Join Queue
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+
+<div class="d-flex justify-content-center gap-2 mt-4">
+    <a href="{{ url_for('gym.equipment_list') }}" class="btn btn-secondary">
+        <i class="fas fa-list mr-1"></i> Back to Equipment List
+    </a>
+    <a href="{{ url_for('gym.my_reservations') }}" class="btn btn-secondary">
+        <i class="fas fa-calendar-check mr-1"></i> My Reservations
+    </a>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const reservations = [];
+
+        {% if user_reservation %}
+            reservations.push({
+                id: {{ user_reservation.id }},
+                equipment_name: "{{ equipment.name }}",
+                end_time: "{{ user_reservation.end_time.isoformat() }}",
+                start_time: "{{ user_reservation.start_time.isoformat() }}",
+                queue_position: {{ user_reservation.queue_position }}
+            });
+        {% endif %}
+
+        if (reservations.length > 0) {
+            startReservationMonitoring(reservations);
+        }
+
+        function updateRemainingTime() {
+            const timeElements = document.querySelectorAll('.time-remaining');
+            timeElements.forEach(element => {
+                const endTime = new Date(element.getAttribute('data-end-time'));
+                const now = new Date();
+                const diffMinutes = Math.floor((endTime - now) / (1000 * 60));
+
+                if (diffMinutes <= 0) {
+                    element.textContent = '0 minutes';
+                    element.style.color = '#dc3545';
+                } else if (diffMinutes <= 5) {
+                    element.textContent = diffMinutes + ' minutes';
+                    element.style.color = '#ffc107';
+                } else {
+                    element.textContent = diffMinutes + ' minutes';
+                    element.style.color = '#28a745';
+                }
+            });
+        }
+
+        updateRemainingTime();
+        setInterval(updateRemainingTime, 60000);
+
+        window.addEventListener('beforeunload', function() {
+            stopReservationMonitoring();
+        });
+    });
+</script>
+{% endblock %}

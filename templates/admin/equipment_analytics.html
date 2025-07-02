@@ -1,0 +1,345 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="analytics-container">
+    <h1>Equipment Analytics</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="period-selector">
+        <h3>Analysis Period: {{ period_name }}</h3>
+        <div class="period-buttons">
+            <a href="{{ url_for('admin.equipment_analytics', period='weekly', sort_by=sort_by) }}"
+               class="btn {% if period == 'weekly' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Weekly
+            </a>
+            <a href="{{ url_for('admin.equipment_analytics', period='monthly', sort_by=sort_by) }}"
+               class="btn {% if period == 'monthly' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Monthly
+            </a>
+            <a href="{{ url_for('admin.equipment_analytics', period='yearly', sort_by=sort_by) }}"
+               class="btn {% if period == 'yearly' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Yearly
+            </a>
+        </div>
+    </div>
+
+    <div class="sort-selector">
+        <h3>Sort By:</h3>
+        <div class="sort-buttons">
+            <a href="{{ url_for('admin.equipment_analytics', period=period, sort_by='sessions') }}"
+               class="btn {% if sort_by == 'sessions' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Total Sessions
+            </a>
+            <a href="{{ url_for('admin.equipment_analytics', period=period, sort_by='hours') }}"
+               class="btn {% if sort_by == 'hours' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Total Hours
+            </a>
+            <a href="{{ url_for('admin.equipment_analytics', period=period, sort_by='duration') }}"
+               class="btn {% if sort_by == 'duration' %}btn-primary{% else %}btn-secondary{% endif %}">
+                Average Duration
+            </a>
+        </div>
+    </div>
+
+    <div class="analytics-table-container">
+        <h3>Equipment Usage Statistics
+            {% if sort_by == 'hours' %}(Sorted by Total Hours)
+            {% elif sort_by == 'sessions' %}(Sorted by Sessions)
+            {% elif sort_by == 'duration' %}(Sorted by Average Duration)
+            {% endif %}
+        </h3>
+        <div class="table-wrapper">
+            <table class="analytics-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Equipment Name</th>
+                        <th class="{% if sort_by == 'sessions' %}sorted-header{% endif %}">Total Sessions</th>
+                        <th class="{% if sort_by == 'hours' %}sorted-header{% endif %}">Total Hours</th>
+                        <th class="{% if sort_by == 'duration' %}sorted-header{% endif %}">Average Duration (min)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in equipment_stats %}
+                        <tr class="equipment-row">
+                            <td class="rank-cell">
+                                <span class="rank-number">#{{ loop.index }}</span>
+                            </td>
+                            <td class="equipment-name">
+                                <h4>{{ stat.equipment.name }}</h4>
+                            </td>
+                            <td class="stat-cell">
+                                <div class="stat-number">{{ stat.total_sessions }}</div>
+                            </td>
+                            <td class="stat-cell">
+                                <div class="stat-number">{{ stat.total_hours }}</div>
+                            </td>
+                            <td class="stat-cell">
+                                <div class="stat-number">{{ stat.avg_duration }}</div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="no-data-message">
+                                No equipment usage data found for the selected period.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="back-link">
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-secondary">
+            Back to Admin Dashboard
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block additional_styles %}
+<style>
+    .analytics-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .analytics-container h1 {
+        text-align: center;
+        margin-bottom: 30px;
+        color: var(--primary-color);
+        font-size: 2rem;
+        font-weight: 600;
+    }
+
+    /* Period Selector */
+    .period-selector, .sort-selector {
+        background: white;
+        padding: 20px;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .period-selector h3, .sort-selector h3 {
+        color: var(--primary-color);
+        margin-bottom: 15px;
+        font-size: 1.3rem;
+    }
+
+    .period-buttons, .sort-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .period-buttons .btn, .sort-buttons .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #000099;
+        transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background-color: #5a6268;
+        transform: translateY(-2px);
+    }
+
+    /* Analytics Table */
+    .analytics-table-container {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        padding: 25px;
+        margin-bottom: 30px;
+    }
+
+    .analytics-table-container h3 {
+        color: var(--primary-color);
+        margin-bottom: 20px;
+        font-size: 1.5rem;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+    }
+
+    .analytics-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+    }
+
+    .analytics-table th {
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        padding: 15px 12px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        color: var(--dark-color);
+        font-size: 0.95rem;
+    }
+
+    .analytics-table th.sorted-header {
+        background: var(--primary-color);
+        color: white;
+        font-weight: bold;
+    }
+
+    .analytics-table td {
+        padding: 15px 12px;
+        border-bottom: 1px solid #f0f2f5;
+        vertical-align: middle;
+    }
+
+    .equipment-row:hover {
+        background-color: #f8f9fa;
+        transition: background-color 0.2s ease;
+    }
+
+    .rank-cell {
+        text-align: center;
+        width: 80px;
+    }
+
+    .rank-number {
+        font-size: 1.2rem;
+        font-weight: bold;
+        color: var(--secondary-color);
+        background: #f8f9fa;
+        padding: 5px 10px;
+        border-radius: 15px;
+    }
+
+    .equipment-name h4 {
+        margin: 0;
+        color: var(--primary-color);
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+
+    .stat-cell {
+        text-align: center;
+    }
+
+    .stat-number {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        line-height: 1;
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+
+    .no-data-message {
+        text-align: center;
+        padding: 40px;
+        color: var(--gray-color);
+        font-style: italic;
+        font-size: 1rem;
+    }
+
+    .back-link {
+        text-align: center;
+        margin-top: 30px;
+    }
+
+    .back-link .btn {
+        padding: 10px 20px;
+        background-color: #6c757d;
+        color: white;
+        text-decoration: none;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+    }
+
+    .back-link .btn:hover {
+        background-color: #5a6268;
+        transform: translateY(-2px);
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .analytics-container {
+            padding: 15px;
+        }
+
+        .period-buttons, .sort-buttons {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .period-buttons .btn, .sort-buttons .btn {
+            width: 200px;
+        }
+
+        .analytics-table-container {
+            padding: 15px;
+        }
+
+        .table-wrapper {
+            overflow-x: scroll;
+        }
+
+        .analytics-table {
+            min-width: 600px;
+        }
+
+        .analytics-table th,
+        .analytics-table td {
+            padding: 10px 8px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .period-buttons .btn, .sort-buttons .btn {
+            width: 100%;
+            padding: 12px;
+        }
+
+        .analytics-table {
+            min-width: 500px;
+        }
+
+        .analytics-table th,
+        .analytics-table td {
+            padding: 8px 6px;
+        }
+
+        .stat-number {
+            font-size: 1rem;
+        }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h1 class="page-title">Welcome to Işık University Gym Center</h1>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ category }}">
+    {{ message }}
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h2 class="card-title">Current Gym Occupancy</h2>
+    </div>
+    <div class="card-body text-center">
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: {{ gym_occupancy }}%;"
+                 aria-valuenow="{{ gym_occupancy }}" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="mt-2 mb-2">
+            <span class="badge {% if gym_occupancy < 50 %}badge-success{% elif gym_occupancy < 80 %}badge-warning{% else %}badge-danger{% endif %}">
+                {{ gym_occupancy }}% Occupied
+            </span>
+        </div>
+        <p class="mt-2">
+            {% if gym_occupancy < 50 %}
+            <span class="text-success">Low occupancy - Great time to work out!</span>
+            {% elif gym_occupancy < 80 %}
+            <span class="text-warning">Moderate occupancy</span>
+            {% else %}
+            <span class="text-danger">High occupancy - Expect to wait for equipment</span>
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="equipment-grid">
+            <div class="equipment-card">
+                <h3 class="equipment-title">Gym Entry</h3>
+                <div class="equipment-info">
+                    <p>Scan the QR code at the gym entrance to check in.</p>
+                </div>
+                <div class="equipment-actions">
+                    <a href="{{ url_for('gym.gym_entry_qr') }}" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt mr-1"></i> Scan Entry QR
+                    </a>
+                </div>
+            </div>
+
+            <div class="equipment-card">
+                <h3 class="equipment-title">Gym Exit</h3>
+                <div class="equipment-info">
+                    <p>Don't forget to scan the QR code when leaving the gym.</p>
+                </div>
+                <div class="equipment-actions">
+                    <a href="{{ url_for('gym.gym_exit_qr') }}" class="btn btn-primary">
+                        <i class="fas fa-sign-out-alt mr-1"></i> Scan Exit QR
+                    </a>
+                </div>
+            </div>
+
+            <div class="equipment-card">
+                <h3 class="equipment-title">Available Equipment</h3>
+                <div class="equipment-info">
+                    <p>View and reserve available gym equipment.</p>
+                </div>
+                <div class="equipment-actions">
+                    <a href="{{ url_for('gym.equipment_list') }}" class="btn btn-primary">
+                        <i class="fas fa-dumbbell mr-1"></i> View Equipment
+                    </a>
+                </div>
+            </div>
+
+            <div class="equipment-card">
+                <h3 class="equipment-title">My Reservations</h3>
+                <div class="equipment-info">
+                    <p>View and manage your equipment reservations.</p>
+                </div>
+                <div class="equipment-actions">
+                    <a href="{{ url_for('gym.my_reservations') }}" class="btn btn-primary">
+                        <i class="fas fa-calendar-check mr-1"></i> View Reservations
+                    </a>
+                </div>
+            </div>
+
+            <div class="equipment-card">
+                <h3 class="equipment-title">Scan Equipment</h3>
+                <div class="equipment-info">
+                    <p>Scan equipment QR code to reserve or check its status.</p>
+                </div>
+                <div class="equipment-actions">
+                    <a href="{{ url_for('gym.scan_equipment_qr') }}" class="btn btn-primary">
+                        <i class="fas fa-qrcode mr-1"></i> Scan Equipment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

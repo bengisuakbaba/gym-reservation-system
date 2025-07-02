@@ -1,0 +1,948 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h1 class="page-title">My Reservations</h1>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="notification-permission-banner" id="notification-banner" style="display: none;">
+    <div class="banner-text">
+        <div class="banner-title">Enable Notifications</div>
+        <p class="banner-desc">Get notified when your workout session is about to end</p>
+    </div>
+    <div class="banner-actions">
+        <button class="btn btn-primary btn-sm" id="enable-notifications">Enable</button>
+        <button class="btn btn-secondary btn-sm" id="dismiss-banner">Dismiss</button>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body text-center">
+        <div class="d-flex justify-content-center gap-2 mt-3">
+            <a href="{{ url_for('gym.equipment_list') }}" class="btn btn-primary">
+                <i class="fas fa-dumbbell mr-1"></i> View Equipment
+            </a>
+            <a href="{{ url_for('gym.scan_equipment_qr') }}" class="btn btn-secondary">
+                <i class="fas fa-qrcode mr-1"></i> Scan Equipment QR
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="gym-tabs-wrapper">
+    <div class="gym-tabs">
+        <button class="gym-tab active" data-tab="active">
+            <div class="tab-content">
+                <div class="tab-icon">
+                    <i class="fas fa-play-circle"></i>
+                </div>
+                <div class="tab-label">Currently Using</div>
+            </div>
+        </button>
+        <button class="gym-tab" data-tab="queued">
+            <div class="tab-content">
+                <div class="tab-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="tab-label">In Queue</div>
+            </div>
+        </button>
+        <button class="gym-tab" data-tab="history">
+            <div class="tab-content">
+                <div class="tab-icon">
+                    <i class="fas fa-history"></i>
+                </div>
+                <div class="tab-label">Workout History</div>
+            </div>
+        </button>
+    </div>
+</div>
+
+<div class="tab-content-panel active" id="active-tab">
+    <div class="equipment-grid">
+        {% if reservations %}
+            {% set active_found = false %}
+            {% for reservation in reservations %}
+                {% if reservation.queue_position == 0 %}
+                    {% set active_found = true %}
+                    <div class="reservation-card active">
+                        <h3 class="reservation-title">{{ equipment_map[reservation.equipment_id].name }}</h3>
+                        <div class="reservation-info">
+                            <p><i class="far fa-clock"></i> <strong>Start time:</strong> {{ reservation.start_time.strftime('%H:%M') }}</p>
+                            <p><i class="far fa-clock"></i> <strong>End time:</strong> {{ reservation.end_time.strftime('%H:%M') }}</p>
+                            <p><i class="fas fa-hourglass-half"></i> <strong>Duration:</strong> {{ reservation.duration_minutes }} minutes</p>
+
+                            {% if now < reservation.end_time %}
+                                {% set remaining_seconds = (reservation.end_time - now).total_seconds() %}
+                                {% set remaining_minutes = (remaining_seconds / 60)|int %}
+                                <p><i class="fas fa-hourglass-half"></i> <strong>Time remaining:</strong> <span class="time-remaining" data-end-time="{{ reservation.end_time.isoformat() }}">{{ remaining_minutes }} minutes</span></p>
+                            {% else %}
+                                <p><i class="fas fa-hourglass-half"></i> <strong>Time remaining:</strong> <span class="time-remaining" data-end-time="{{ reservation.end_time.isoformat() }}">0 minutes</span></p>
+                            {% endif %}
+                        </div>
+
+                        <div class="reservation-actions">
+                            <form action="{{ url_for('gym.update_reservation', reservation_id=reservation.id) }}" method="POST" class="d-flex gap-2">
+                                <div class="form-group mb-0">
+                                    <label for="duration-{{ reservation.id }}" class="form-label mb-0 mr-2">Decrease time:</label>
+                                    <input type="number" name="duration" id="duration-{{ reservation.id }}"
+                                           min="5" max="{{ reservation.duration_minutes }}" value="{{ reservation.duration_minutes }}" class="form-control">
+                                </div>
+                                <button type="submit" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-sync-alt"></i> Update
+                                </button>
+                            </form>
+
+                            <form action="{{ url_for('gym.cancel_reservation', reservation_id=reservation.id) }}" method="POST">
+                                <button type="submit" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-times"></i> Finish Early
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            {% if not active_found %}
+                <div class="no-active-message">
+                    <div class="empty-state">
+                        <i class="fas fa-play-circle text-muted" style="font-size: 3rem;"></i>
+                        <h3 class="mt-3">No Active Sessions</h3>
+                        <p class="text-muted">You're not currently using any equipment.</p>
+                        <a href="{{ url_for('gym.equipment_list') }}" class="btn btn-primary">
+                            <i class="fas fa-dumbbell me-1"></i> Browse Equipment
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="no-active-message">
+                <div class="empty-state">
+                    <i class="fas fa-play-circle text-muted" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3">No Active Sessions</h3>
+                    <p class="text-muted">You're not currently using any equipment.</p>
+                    <a href="{{ url_for('gym.equipment_list') }}" class="btn btn-primary">
+                        <i class="fas fa-dumbbell me-1"></i> Browse Equipment
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="tab-content-panel" id="queued-tab">
+    <div class="equipment-grid">
+        {% if reservations %}
+            {% set queued_found = false %}
+            {% for reservation in reservations %}
+                {% if reservation.queue_position > 0 %}
+                    {% set queued_found = true %}
+                    <div class="reservation-card queued">
+                        <div class="queue-badge">
+                            <span class="badge badge-warning">Position {{ reservation.queue_position }}</span>
+                        </div>
+                        <h3 class="reservation-title">{{ equipment_map[reservation.equipment_id].name }}</h3>
+                        <div class="reservation-info">
+                            <p><i class="far fa-clock"></i> <strong>Expected start:</strong> {{ reservation.start_time.strftime('%H:%M') }}</p>
+                            <p><i class="far fa-clock"></i> <strong>Expected end:</strong> {{ reservation.end_time.strftime('%H:%M') }}</p>
+                            <p><i class="fas fa-hourglass-half"></i> <strong>Duration:</strong> {{ reservation.duration_minutes }} minutes</p>
+                        </div>
+
+                        <div class="reservation-actions">
+                            <form action="{{ url_for('gym.cancel_reservation', reservation_id=reservation.id) }}" method="POST">
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="fas fa-times mr-1"></i> Cancel
+                                </button>
+                            </form>
+
+                            <a href="{{ url_for('gym.equipment_detail', qr_code=equipment_map[reservation.equipment_id].qr_code) }}" class="btn btn-secondary">
+                                <i class="fas fa-info-circle mr-1"></i> View Equipment
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            {% if not queued_found %}
+                <div class="no-queue-message">
+                    <div class="empty-state">
+                        <i class="fas fa-clock text-muted" style="font-size: 3rem;"></i>
+                        <h3 class="mt-3">No Queue Reservations</h3>
+                        <p class="text-muted">You don't have any equipment reservations in queue.</p>
+                        <a href="{{ url_for('gym.equipment_list') }}" class="btn btn-primary">
+                            <i class="fas fa-dumbbell me-1"></i> Reserve Equipment
+                        </a>
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="no-queue-message">
+                <div class="empty-state">
+                    <i class="fas fa-clock text-muted" style="font-size: 3rem;"></i>
+                    <h3 class="mt-3">No Queue Reservations</h3>
+                    <p class="text-muted">You don't have any equipment reservations in queue.</p>
+                    <a href="{{ url_for('gym.equipment_list') }}" class="btn btn-primary">
+                        <i class="fas fa-dumbbell me-1"></i> Reserve Equipment
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="tab-content-panel" id="history-tab">
+    <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <h2>Loading workout history...</h2>
+        <p class="text-muted">Please wait while we fetch your data</p>
+    </div>
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left mr-1"></i> Back to Dashboard
+    </a>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const notificationBanner = document.getElementById('notification-banner');
+        const enableNotificationsBtn = document.getElementById('enable-notifications');
+        const dismissBannerBtn = document.getElementById('dismiss-banner');
+
+        if ('Notification' in window && Notification.permission === 'default' &&
+            !localStorage.getItem('notificationBannerDismissed')) {
+            notificationBanner.style.display = 'flex';
+        }
+
+        if (enableNotificationsBtn) {
+            enableNotificationsBtn.addEventListener('click', async function() {
+                try {
+                    const permission = await Notification.requestPermission();
+                    if (permission === 'granted') {
+                        notificationBanner.style.display = 'none';
+                        localStorage.setItem('notificationBannerDismissed', 'true');
+
+                        const successAlert = document.createElement('div');
+                        successAlert.className = 'alert alert-success';
+                        successAlert.innerHTML = 'Notifications enabled! You\'ll be notified when your workout is about to end.';
+                        document.querySelector('.container').insertBefore(successAlert, document.querySelector('.card'));
+
+                        setTimeout(() => successAlert.remove(), 4000);
+                    }
+                } catch (error) {
+                    console.error('Error requesting notification permission:', error);
+                }
+            });
+        }
+
+        if (dismissBannerBtn) {
+            dismissBannerBtn.addEventListener('click', function() {
+                notificationBanner.style.display = 'none';
+                localStorage.setItem('notificationBannerDismissed', 'true');
+            });
+        }
+
+        const reservations = [];
+        {% for reservation in reservations %}
+            reservations.push({
+                id: {{ reservation.id }},
+                equipment_name: "{{ equipment_map[reservation.equipment_id].name }}",
+                end_time: "{{ reservation.end_time.isoformat() }}",
+                start_time: "{{ reservation.start_time.isoformat() }}",
+                queue_position: {{ reservation.queue_position }}
+            });
+        {% endfor %}
+
+        if (reservations.length > 0) {
+            startReservationMonitoring(reservations);
+        }
+
+        function updateRemainingTime() {
+            const timeElements = document.querySelectorAll('.time-remaining');
+            timeElements.forEach(element => {
+                const endTime = new Date(element.getAttribute('data-end-time'));
+                const now = new Date();
+                const diffMinutes = Math.floor((endTime - now) / (1000 * 60));
+
+                if (diffMinutes <= 0) {
+                    element.textContent = '0 minutes';
+                    element.style.color = '#dc3545';
+                } else if (diffMinutes <= 5) {
+                    element.textContent = diffMinutes + ' minutes';
+                    element.style.color = '#ffc107';
+                } else {
+                    element.textContent = diffMinutes + ' minutes';
+                    element.style.color = '#28a745';
+                }
+            });
+        }
+
+        updateRemainingTime();
+        setInterval(updateRemainingTime, 60000);
+
+        const tabButtons = document.querySelectorAll('.gym-tab');
+        const tabPanels = document.querySelectorAll('.tab-content-panel');
+
+        function showTab(targetTabId) {
+            tabPanels.forEach(panel => {
+                panel.classList.remove('active');
+            });
+
+            tabButtons.forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            const targetPanel = document.getElementById(targetTabId + '-tab');
+            if (targetPanel) {
+                targetPanel.classList.add('active');
+            }
+
+            const activeTab = document.querySelector(`.gym-tab[data-tab="${targetTabId}"]`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
+        }
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const tabId = this.getAttribute('data-tab');
+                showTab(tabId);
+
+                if (tabId === 'history' && !document.getElementById('history-tab').dataset.loaded) {
+                    loadHistoryContent();
+                }
+            });
+        });
+
+        function loadHistoryContent() {
+            const historyTab = document.getElementById('history-tab');
+
+            fetch('/gym/reservation-history')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const historyContent = doc.querySelector('.history-content');
+
+                    if (historyContent) {
+                        const oldFilterTabs = historyContent.querySelector('.history-filter-tabs');
+                        if (oldFilterTabs) {
+                            const filterContainer = document.createElement('div');
+                            filterContainer.className = 'history-filter-wrapper';
+                            filterContainer.innerHTML = `
+                                <div class="history-filters">
+                                    <button class="history-filter-btn active" data-filter="all">
+                                        <i class="fas fa-calendar-alt"></i>
+                                        <span>All Time</span>
+                                    </button>
+                                    <button class="history-filter-btn" data-filter="today">
+                                        <i class="fas fa-calendar-day"></i>
+                                        <span>Today</span>
+                                    </button>
+                                    <button class="history-filter-btn" data-filter="week">
+                                        <i class="fas fa-calendar-week"></i>
+                                        <span>This Week</span>
+                                    </button>
+                                    <button class="history-filter-btn" data-filter="month">
+                                        <i class="fas fa-calendar"></i>
+                                        <span>This Month</span>
+                                    </button>
+                                    <button class="history-filter-btn" data-filter="custom">
+                                        <i class="fas fa-calendar-check"></i>
+                                        <span>Custom Date</span>
+                                    </button>
+                                </div>
+                            `;
+
+                            oldFilterTabs.parentNode.replaceChild(filterContainer, oldFilterTabs);
+                        }
+
+                        historyTab.innerHTML = historyContent.outerHTML;
+                        historyTab.dataset.loaded = 'true';
+
+                        setupHistoryFilterButtons();
+                    } else {
+                        throw new Error('History content not found');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading history:', error);
+                    historyTab.innerHTML = `
+                        <div class="error-state text-center">
+                            <i class="fas fa-exclamation-triangle text-danger" style="font-size: 3rem; margin-bottom: 20px;"></i>
+                            <h3>Unable to load workout history</h3>
+                            <p class="text-muted">Please try again later or refresh the page.</p>
+                            <button class="btn btn-primary" onclick="location.reload()">
+                                <i class="fas fa-sync-alt mr-1"></i> Retry
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+
+        function setupHistoryFilterButtons() {
+            const historyTab = document.getElementById('history-tab');
+            if (!historyTab) return;
+
+            const filterButtons = historyTab.querySelectorAll('.history-filter-btn');
+            const dateGroups = historyTab.querySelectorAll('.history-date-group');
+            const customDateCard = historyTab.querySelector('#custom-date-card');
+            const dateInput = historyTab.querySelector('#date-input');
+            const applyDateBtn = historyTab.querySelector('#apply-date');
+            const cancelDateBtn = historyTab.querySelector('#cancel-date');
+            const selectedDateSummary = historyTab.querySelector('#selected-date-summary');
+
+            const totalSessionsStat = historyTab.querySelector('#total-sessions-stat');
+            const totalTimeStat = historyTab.querySelector('#total-time-stat');
+            const caloriesStat = historyTab.querySelector('#calories-stat');
+            const mostUsedStat = historyTab.querySelector('#most-used-stat');
+
+            if (dateInput) {
+                const today = new Date();
+                dateInput.max = today.toISOString().split('T')[0];
+            }
+
+            function calculateStats() {
+                let totalSessions = 0;
+                let totalMinutes = 0;
+                let equipmentUsage = {};
+
+                dateGroups.forEach(group => {
+                    if (group.style.display !== 'none') {
+                        const workoutItems = group.querySelectorAll('.workout-item');
+                        totalSessions += workoutItems.length;
+
+                        workoutItems.forEach(item => {
+                            const duration = parseInt(item.getAttribute('data-duration'));
+                            const equipment = item.getAttribute('data-equipment');
+
+                            totalMinutes += duration;
+
+                            if (equipmentUsage[equipment]) {
+                                equipmentUsage[equipment] += duration;
+                            } else {
+                                equipmentUsage[equipment] = duration;
+                            }
+                        });
+                    }
+                });
+
+                let mostUsedEquipment = 'N/A';
+                let maxUsage = 0;
+                for (const [equipment, usage] of Object.entries(equipmentUsage)) {
+                    if (usage > maxUsage) {
+                        maxUsage = usage;
+                        mostUsedEquipment = equipment;
+                    }
+                }
+
+                const estimatedCalories = Math.round(totalMinutes * 5);
+
+                if (totalSessionsStat) totalSessionsStat.textContent = totalSessions;
+                if (totalTimeStat) totalTimeStat.textContent = (totalMinutes / 60).toFixed(1) + 'h';
+                if (caloriesStat) caloriesStat.textContent = totalMinutes > 0 ? estimatedCalories : '0';
+                if (mostUsedStat) mostUsedStat.textContent = mostUsedEquipment;
+            }
+
+            filterButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const filter = this.getAttribute('data-filter');
+
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+
+                    if (filter === 'custom') {
+                        if (customDateCard) {
+                            customDateCard.style.display = 'block';
+                            customDateCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                        return;
+                    }
+
+                    applyHistoryFilter(filter);
+                });
+            });
+
+            if (applyDateBtn) {
+                applyDateBtn.addEventListener('click', function() {
+                    const selectedDate = dateInput.value;
+                    if (selectedDate) {
+                        applyCustomDateFilter(selectedDate);
+                    } else {
+                        alert('Please select a date first.');
+                    }
+                });
+            }
+
+            if (cancelDateBtn) {
+                cancelDateBtn.addEventListener('click', function() {
+                    if (customDateCard) {
+                        customDateCard.style.display = 'none';
+                    }
+                    const allTimeBtn = historyTab.querySelector('.history-filter-btn[data-filter="all"]');
+                    if (allTimeBtn) {
+                        allTimeBtn.click();
+                    }
+                });
+            }
+
+            function applyHistoryFilter(filter) {
+                if (customDateCard) customDateCard.style.display = 'none';
+                if (selectedDateSummary) selectedDateSummary.style.display = 'none';
+
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const weekStart = new Date(today);
+                const day = weekStart.getDay();
+                const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
+                weekStart.setDate(diff);
+
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+                let visibleGroups = 0;
+                dateGroups.forEach(group => {
+                    const groupDateStr = group.getAttribute('data-date');
+                    const groupDate = new Date(groupDateStr + 'T00:00:00');
+                    let show = true;
+
+                    switch(filter) {
+                        case 'today':
+                            show = groupDate.getTime() === today.getTime();
+                            break;
+                        case 'week':
+                            show = groupDate >= weekStart && groupDate <= today;
+                            break;
+                        case 'month':
+                            show = groupDate >= monthStart && groupDate <= today;
+                            break;
+                        case 'all':
+                        default:
+                            show = true;
+                            break;
+                    }
+
+                    if (show) {
+                        group.style.display = 'block';
+                        visibleGroups++;
+                    } else {
+                        group.style.display = 'none';
+                    }
+                });
+
+                calculateStats();
+
+                const noResultsMessage = historyTab.querySelector('#no-results-message');
+                const historyTimeline = historyTab.querySelector('.history-timeline');
+
+                if (visibleGroups === 0 && filter !== 'all') {
+                    if (historyTimeline) historyTimeline.style.display = 'none';
+                    if (noResultsMessage) {
+                        noResultsMessage.style.display = 'block';
+                        const noResultsText = noResultsMessage.querySelector('#no-results-text');
+                        if (noResultsText) {
+                            switch(filter) {
+                                case 'today':
+                                    noResultsText.textContent = 'No workouts found for today.';
+                                    break;
+                                case 'week':
+                                    noResultsText.textContent = 'No workouts found for this week.';
+                                    break;
+                                case 'month':
+                                    noResultsText.textContent = 'No workouts found for this month.';
+                                    break;
+                            }
+                        }
+                    }
+
+                    if (totalSessionsStat) totalSessionsStat.textContent = '0';
+                    if (totalTimeStat) totalTimeStat.textContent = '0h';
+                    if (caloriesStat) caloriesStat.textContent = '0';
+                    if (mostUsedStat) mostUsedStat.textContent = 'N/A';
+                } else {
+                    if (historyTimeline) historyTimeline.style.display = 'block';
+                    if (noResultsMessage) noResultsMessage.style.display = 'none';
+                }
+            }
+
+            function applyCustomDateFilter(selectedDate) {
+                if (customDateCard) customDateCard.style.display = 'none';
+
+                const targetDate = new Date(selectedDate + 'T00:00:00');
+                let foundDate = false;
+                let totalSessions = 0;
+                let totalMinutes = 0;
+
+                dateGroups.forEach(group => {
+                    const groupDateStr = group.getAttribute('data-date');
+                    const groupDate = new Date(groupDateStr + 'T00:00:00');
+
+                    if (groupDate.getTime() === targetDate.getTime()) {
+                        group.style.display = 'block';
+                        foundDate = true;
+
+                        const sessions = group.querySelectorAll('.workout-item').length;
+                        totalSessions = sessions;
+
+                        const durations = group.querySelectorAll('.duration-badge');
+                        durations.forEach(badge => {
+                            const match = badge.textContent.match(/\d+/);
+                            if (match) {
+                                const minutes = parseInt(match[0]);
+                                totalMinutes += minutes;
+                            }
+                        });
+                    } else {
+                        group.style.display = 'none';
+                    }
+                });
+
+                calculateStats();
+
+                const noResultsMessage = historyTab.querySelector('#no-results-message');
+                const historyTimeline = historyTab.querySelector('.history-timeline');
+
+                if (foundDate && totalSessions > 0) {
+                    if (historyTimeline) historyTimeline.style.display = 'block';
+                    if (noResultsMessage) noResultsMessage.style.display = 'none';
+
+                    if (selectedDateSummary) {
+                        const dateObj = new Date(selectedDate);
+                        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+
+                        const summaryTitle = selectedDateSummary.querySelector('#summary-title');
+                        const summarySessions = selectedDateSummary.querySelector('#summary-sessions');
+                        const summaryTime = selectedDateSummary.querySelector('#summary-time');
+                        const summaryCalories = selectedDateSummary.querySelector('#summary-calories');
+
+                        if (summaryTitle) summaryTitle.innerHTML =
+                            `<i class="fas fa-calendar-check text-primary"></i> Workout Summary - ${dateObj.toLocaleDateString('en-US', options)}`;
+                        if (summarySessions) summarySessions.textContent =
+                            `${totalSessions} session${totalSessions !== 1 ? 's' : ''}`;
+                        if (summaryTime) summaryTime.textContent =
+                            `${(totalMinutes / 60).toFixed(1)}h total`;
+                        if (summaryCalories) summaryCalories.textContent =
+                            `~${(totalMinutes * 5)} calories`;
+
+                        selectedDateSummary.style.display = 'block';
+                    }
+                } else {
+                    if (historyTimeline) historyTimeline.style.display = 'none';
+                    if (noResultsMessage) {
+                        noResultsMessage.style.display = 'block';
+                        const noResultsText = noResultsMessage.querySelector('#no-results-text');
+                        if (noResultsText) {
+                            const dateObj = new Date(selectedDate);
+                            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                            noResultsText.textContent = `No workouts found for ${dateObj.toLocaleDateString('en-US', options)}.`;
+                        }
+                    }
+
+                    if (totalSessionsStat) totalSessionsStat.textContent = '0';
+                    if (totalTimeStat) totalTimeStat.textContent = '0h';
+                    if (mostUsedStat) mostUsedStat.textContent = 'N/A';
+                }
+            }
+
+            applyHistoryFilter('all');
+
+            window.applyHistoryFilter = applyHistoryFilter;
+            window.resetToAllTime = function() {
+                const allTimeBtn = historyTab.querySelector('.history-filter-btn[data-filter="all"]');
+                if (allTimeBtn) {
+                    allTimeBtn.click();
+                }
+            };
+        }
+
+        showTab('active');
+
+        window.addEventListener('beforeunload', function() {
+            stopReservationMonitoring();
+        });
+    });
+</script>
+
+<style>
+    .gym-tabs-wrapper {
+        margin-bottom: 25px;
+        padding: 0 10px;
+    }
+
+    .gym-tabs {
+        display: flex;
+        background-color: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .gym-tab {
+        flex: 1;
+        border: none;
+        background: none;
+        padding: 0;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        border-right: 1px solid #f0f2f5;
+    }
+
+    .gym-tab:last-child {
+        border-right: none;
+    }
+
+    .gym-tab .tab-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 15px 10px;
+        background-color: white;
+        transition: all 0.3s ease;
+    }
+
+    .gym-tab.active .tab-content {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .gym-tab .tab-icon {
+        font-size: 24px;
+        margin-bottom: 8px;
+        color: #6c757d;
+    }
+
+    .gym-tab.active .tab-icon {
+        color: white;
+    }
+
+    .gym-tab .tab-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: #495057;
+        text-align: center;
+    }
+
+    .gym-tab.active .tab-label {
+        color: white;
+    }
+
+    .gym-tab:hover:not(.active) .tab-content {
+        background-color: #f8f9fa;
+    }
+
+    .history-filter-wrapper {
+        margin: 20px 0;
+    }
+
+    .history-filters {
+        display: flex;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .history-filter-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 15px;
+        border: none;
+        background: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-right: 1px solid #f0f2f5;
+        color: #6c757d;
+    }
+
+    .history-filter-btn:last-child {
+        border-right: none;
+    }
+
+    .history-filter-btn i {
+        font-size: 18px;
+        margin-bottom: 5px;
+    }
+
+    .history-filter-btn span {
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .history-filter-btn.active {
+        background-color: var(--secondary-color);
+        color: white;
+    }
+
+    .history-filter-btn:hover:not(.active) {
+        background-color: #f8f9fa;
+    }
+
+    .tab-content-panel {
+        display: none;
+    }
+
+    .tab-content-panel.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .no-active-message,
+    .no-queue-message {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+    }
+
+    .empty-state {
+        text-align: center;
+        max-width: 400px;
+    }
+
+    .empty-state h3 {
+        color: var(--primary-color);
+        margin-bottom: 15px;
+    }
+
+    .empty-state p {
+        color: var(--gray-color);
+        margin-bottom: 25px;
+    }
+
+    .loading-state {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+    }
+
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f4f6;
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-state h2 {
+        color: var(--primary-color);
+        margin-bottom: 10px;
+    }
+
+    .loading-state p {
+        color: var(--gray-color);
+        margin-bottom: 0;
+    }
+
+    .error-state {
+        padding: 60px 20px;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+    }
+
+    .error-state h3 {
+        color: var(--danger-color);
+        margin-bottom: 15px;
+    }
+
+    .error-state p {
+        color: var(--gray-color);
+        margin-bottom: 25px;
+    }
+
+    .no-results-state {
+        padding: 40px 20px;
+    }
+
+    .no-results-state h3 {
+        color: var(--dark-color);
+        margin-bottom: 15px;
+    }
+
+    .no-results-state p {
+        color: var(--gray-color);
+        margin-bottom: 25px;
+    }
+
+    @media (max-width: 768px) {
+        .gym-tab .tab-content {
+            padding: 12px 8px;
+        }
+
+        .gym-tab .tab-icon {
+            font-size: 20px;
+            margin-bottom: 6px;
+        }
+
+        .gym-tab .tab-label {
+            font-size: 12px;
+        }
+
+        .history-filter-btn {
+            padding: 8px 5px;
+        }
+
+        .history-filter-btn i {
+            font-size: 16px;
+            margin-bottom: 3px;
+        }
+
+        .history-filter-btn span {
+            font-size: 10px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .history-filters {
+            flex-wrap: wrap;
+        }
+
+        .history-filter-btn {
+            min-width: 33.333%;
+            border-bottom: 1px solid #f0f2f5;
+        }
+
+        .gym-tab .tab-icon {
+            margin-bottom: 4px;
+        }
+
+        .gym-tab .tab-label {
+            font-size: 11px;
+        }
+    }
+</style>
+{% endblock %}

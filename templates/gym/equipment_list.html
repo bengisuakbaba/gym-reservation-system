@@ -1,0 +1,235 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<h1 class="page-title">Gym Equipment</h1>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<div class="card mb-4">
+    <div class="card-body text-center">
+        <div class="d-flex justify-content-center gap-2 mt-3">
+            <a href="{{ url_for('gym.scan_equipment_qr') }}" class="btn btn-primary">
+                <i class="fas fa-qrcode mr-1"></i> Scan Equipment QR
+            </a>
+            <a href="{{ url_for('gym.my_reservations') }}" class="btn btn-secondary">
+                <i class="fas fa-calendar-check mr-1"></i> My Reservations
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="tabs mb-4">
+    <button class="tab-btn active" data-filter="all">All Equipment</button>
+    <button class="tab-btn" data-filter="available">Available</button>
+    <button class="tab-btn" data-filter="in-use">In Use</button>
+    <button class="tab-btn" data-filter="broken">Out of Order</button>
+</div>
+
+<div class="equipment-grid">
+    {% for equipment in equipment_list %}
+        <div class="equipment-card {% if equipment.is_available %}available{% else %}in-use{% endif %}" id="user-equipment-{{ equipment.id }}">
+            <div class="equipment-status">
+                <span class="badge user-equipment-status-{{ equipment.id }} {% if equipment.is_available %}badge-success{% else %}badge-warning{% endif %}">
+                    {% if equipment.is_available %}
+                        <i class="fas fa-check-circle"></i> Available
+                    {% else %}
+                        <i class="fas fa-user"></i> In Use
+                    {% endif %}
+                </span>
+            </div>
+
+            <h3 class="equipment-title">{{ equipment.name }}</h3>
+
+            <div class="equipment-info user-equipment-info-{{ equipment.id }}">
+                {% if not equipment.is_available and reservations[equipment.id]['current'] %}
+                    {% set current_res = reservations[equipment.id]['current'] %}
+                    <p><i class="far fa-clock"></i> In use until: <strong>{{ current_res.end_time.strftime('%H:%M') }}</strong></p>
+
+                    {% if now < current_res.end_time %}
+                        {% set remaining_seconds = (current_res.end_time - now).total_seconds() %}
+                        {% set remaining_minutes = (remaining_seconds / 60)|int %}
+                        <p><i class="fas fa-hourglass-half"></i> Time remaining: <strong>{{ remaining_minutes }} min</strong></p>
+                    {% else %}
+                        <p><i class="fas fa-hourglass-half"></i> Time remaining: <strong>0 min</strong></p>
+                    {% endif %}
+
+                    {% if reservations[equipment.id]['queue']|length > 0 %}
+                        <p><i class="fas fa-users"></i> People in queue: <strong>{{ reservations[equipment.id]['queue']|length }}</strong></p>
+                    {% endif %}
+                {% else %}
+                    <p><i class="fas fa-check-circle text-success"></i> Ready to use</p>
+                    <p><i class="fas fa-clock"></i> No waiting time</p>
+                {% endif %}
+            </div>
+
+            <div class="equipment-actions">
+                <a href="{{ url_for('gym.equipment_detail', qr_code=equipment.qr_code) }}"
+                   class="btn btn-primary user-equipment-btn-{{ equipment.id }}">
+                    <i class="fas fa-info-circle mr-1"></i> View Details
+                </a>
+            </div>
+        </div>
+    {% else %}
+        <div class="card text-center">
+            <div class="card-body">
+                <p>No equipment found in the gym.</p>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="text-center mt-4">
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left mr-1"></i> Back to Dashboard
+    </a>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const brokenEquipment = JSON.parse(localStorage.getItem('brokenEquipment') || '{}');
+
+        Object.keys(brokenEquipment).forEach(equipmentId => {
+            if (brokenEquipment[equipmentId].isBroken) {
+                updateUserEquipmentDisplay(equipmentId, brokenEquipment[equipmentId]);
+            }
+        });
+
+        const filterButtons = document.querySelectorAll('.tab-btn');
+        const equipmentCards = document.querySelectorAll('.equipment-card');
+
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+
+                const filterType = this.getAttribute('data-filter');
+
+                equipmentCards.forEach(card => {
+                    if (filterType === 'all') {
+                        card.style.display = 'block';
+                    } else if (filterType === 'broken' && card.classList.contains('broken')) {
+                        card.style.display = 'block';
+                    } else if (filterType !== 'broken' && card.classList.contains(filterType)) {
+                        card.style.display = 'block';
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+            });
+        });
+    });
+
+    function updateUserEquipmentDisplay(equipmentId, brokenData) {
+        const card = document.getElementById(`user-equipment-${equipmentId}`);
+        const statusBadge = document.querySelector(`.user-equipment-status-${equipmentId}`);
+        const infoDiv = document.querySelector(`.user-equipment-info-${equipmentId}`);
+        const button = document.querySelector(`.user-equipment-btn-${equipmentId}`);
+
+        if (card && statusBadge && infoDiv && button) {
+            card.classList.remove('available', 'in-use');
+            card.classList.add('broken');
+
+            statusBadge.className = 'badge badge-danger';
+            statusBadge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Out of Order';
+
+            const brokenDate = new Date(brokenData.date).toLocaleDateString();
+            infoDiv.innerHTML = `
+                <div class="broken-info">
+                    <p><i class="fas fa-exclamation-triangle text-danger"></i> <strong>Equipment is currently out of order</strong></p>
+                    ${brokenData.reason ? `<p><i class="fas fa-info-circle"></i> <strong>Issue:</strong> ${brokenData.reason}</p>` : ''}
+                    <p><i class="fas fa-calendar-alt"></i> <strong>Since:</strong> ${brokenDate}</p>
+                    <p class="maintenance-note">
+                        <i class="fas fa-tools"></i> Maintenance has been notified
+                    </p>
+                </div>
+            `;
+
+            button.className = 'btn btn-secondary disabled';
+            button.innerHTML = '<i class="fas fa-ban mr-1"></i> Unavailable';
+            button.style.pointerEvents = 'none';
+            button.style.opacity = '0.6';
+        }
+    }
+</script>
+
+<style>
+    .equipment-card.broken {
+        border-left-color: #dc3545;
+        background: linear-gradient(135deg, #fff5f5 0%, #ffebee 100%);
+        opacity: 0.9;
+    }
+
+    .equipment-card.broken:hover {
+        transform: none;
+        box-shadow: 0 2px 15px rgba(220, 53, 69, 0.2);
+    }
+
+    .equipment-card.broken .equipment-title {
+        color: #721c24;
+    }
+
+    .broken-info {
+        background: rgba(248, 215, 218, 0.3);
+        border: 1px solid #f5c6cb;
+        border-radius: 4px;
+        padding: 15px;
+        margin: 15px 0;
+    }
+
+    .broken-info p {
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+    }
+
+    .broken-info p:last-child {
+        margin-bottom: 0;
+    }
+
+    .maintenance-note {
+        color: #856404 !important;
+        font-style: italic;
+        background: rgba(255, 243, 205, 0.5);
+        padding: 8px;
+        border-radius: 4px;
+        border-left: 3px solid #ffc107;
+    }
+
+    .badge-danger {
+        background-color: #dc3545;
+        animation: pulse-danger 2s infinite;
+    }
+
+    @keyframes pulse-danger {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.8; }
+    }
+
+    .text-danger {
+        color: #dc3545 !important;
+    }
+
+    .btn.disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        background-color: #6c757d;
+    }
+
+    .tab-btn[data-filter="broken"] {
+        color: #dc3545;
+        border-color: #dc3545;
+    }
+
+    .tab-btn[data-filter="broken"].active {
+        background-color: #dc3545;
+        color: white;
+    }
+</style>
+{% endblock %}

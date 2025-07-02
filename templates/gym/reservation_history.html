@@ -1,0 +1,783 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="history-content">
+    <h1 class="page-title">Workout History</h1>
+
+    <div class="stats-grid mb-4" id="stats-grid">
+        <div class="stat-card">
+            <div class="stat-info">
+                <div class="stat-value" id="total-sessions-stat">{{ total_sessions }}</div>
+                <div class="stat-title">Total Sessions</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-info">
+                <div class="stat-value" id="total-time-stat">{{ (total_time / 60)|round(1) }}h</div>
+                <div class="stat-title">Total Time</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-info">
+                <div class="stat-value" id="calories-stat">{{ total_calories }}</div>
+                <div class="stat-title">Calories Burned</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-info">
+                <div class="stat-value" id="most-used-stat">{{ most_used_equipment or 'N/A' }}</div>
+                <div class="stat-title">Most Used Equipment</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="history-filter-tabs">
+        <button class="history-filter-tab active" data-filter="all">
+            <div class="tab-icon">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            <div class="tab-content">
+                <div class="tab-name">All Time</div>
+                <div class="tab-desc">Complete history</div>
+            </div>
+        </button>
+
+        <button class="history-filter-tab" data-filter="today">
+            <div class="tab-icon">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div class="tab-content">
+                <div class="tab-name">Today</div>
+                <div class="tab-desc">Today's workouts</div>
+            </div>
+        </button>
+
+        <button class="history-filter-tab" data-filter="week">
+            <div class="tab-icon">
+                <i class="fas fa-calendar-week"></i>
+            </div>
+            <div class="tab-content">
+                <div class="tab-name">This Week</div>
+                <div class="tab-desc">Past 7 days</div>
+            </div>
+        </button>
+
+        <button class="history-filter-tab" data-filter="month">
+            <div class="tab-icon">
+                <i class="fas fa-calendar"></i>
+            </div>
+            <div class="tab-content">
+                <div class="tab-name">This Month</div>
+                <div class="tab-desc">Current month</div>
+            </div>
+        </button>
+
+        <button class="history-filter-tab" data-filter="custom" id="custom-date-btn">
+            <div class="tab-icon">
+                <i class="fas fa-calendar-check"></i>
+            </div>
+            <div class="tab-content">
+                <div class="tab-name">Custom Date</div>
+                <div class="tab-desc">Pick a specific date</div>
+            </div>
+        </button>
+    </div>
+
+    <div class="card" id="custom-date-card" style="display: none;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-calendar-check text-primary"></i>
+                Select Date
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="custom-date-picker">
+                <label for="date-input" class="form-label">Choose a specific date to view workout history:</label>
+                <div class="d-flex gap-2 align-items-center">
+                    <input type="date" id="date-input" class="form-control" style="max-width: 200px;">
+                    <button id="apply-date" class="btn btn-primary">
+                        <i class="fas fa-search mr-1"></i>Apply
+                    </button>
+                    <button id="cancel-date" class="btn btn-secondary">
+                        <i class="fas fa-times mr-1"></i>Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if grouped_reservations %}
+    <div class="history-timeline">
+        {% for date in sorted_dates %}
+        <div class="history-date-group" data-date="{{ date.strftime('%Y-%m-%d') }}">
+            <div class="card history-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="date-info">
+                            <h3 class="card-title mb-1">
+                                <i class="fas fa-calendar text-primary"></i>
+                                {{ date.strftime('%A') }}
+                            </h3>
+                            <p class="text-muted mb-0">{{ date.strftime('%B %d, %Y') }}</p>
+                        </div>
+
+                        <div class="date-summary">
+                            {% set day_total = grouped_reservations[date]|sum(attribute='duration_minutes') %}
+                            {% set session_count = grouped_reservations[date]|length %}
+                            {% set day_calories = day_calorie_breakdown[date] if date in day_calorie_breakdown else 0 %}
+                            <span class="badge badge-primary me-2">
+                                <i class="fas fa-list me-1"></i>
+                                {{ session_count }} session{{ 's' if session_count != 1 else '' }}
+                            </span>
+                            <span class="badge badge-info me-2">
+                                <i class="far fa-clock me-1"></i>
+                                {{ (day_total / 60)|round(1) }}h
+                            </span>
+                            <span class="badge badge-warning">
+                                <i class="fas fa-fire me-1"></i>
+                                {{ day_calories }} cal
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="workout-grid">
+                        {% for reservation in grouped_reservations[date] %}
+                        {% set equipment_name = equipment_map[reservation.equipment_id].name %}
+                        {% set reservation_calories = reservation_calorie_breakdown[reservation.id] if reservation.id in reservation_calorie_breakdown else 0 %}
+                        <div class="workout-item" data-equipment="{{ equipment_name }}" data-duration="{{ reservation.duration_minutes }}" data-calories="{{ reservation_calories }}">
+                            <div class="workout-details">
+                                <h4 class="workout-title">{{ equipment_name }}</h4>
+                                <div class="workout-time">
+                                    <span class="time-badge">
+                                        <i class="far fa-clock"></i>
+                                        {{ reservation.start_time.strftime('%H:%M') }} - {{ reservation.end_time.strftime('%H:%M') }}
+                                    </span>
+                                    <span class="duration-badge">
+                                        <i class="fas fa-stopwatch"></i>
+                                        {{ reservation.duration_minutes }} min
+                                    </span>
+                                    <span class="calorie-badge">
+                                        <i class="fas fa-fire"></i>
+                                        {{ reservation_calories }} kcal
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="workout-status">
+                                <span class="badge badge-success">
+                                    <i class="fas fa-check-circle"></i>
+                                    Completed
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card" id="no-results-message" style="display: none;">
+        <div class="card-body text-center">
+            <div class="no-results-state">
+                <i class="fas fa-calendar-times text-muted" style="font-size: 3rem; margin-bottom: 20px;"></i>
+                <h3>No workouts found</h3>
+                <p class="text-muted" id="no-results-text">No workout history found for the selected date range.</p>
+                <button class="btn btn-primary" onclick="resetToAllTime()">
+                    <i class="fas fa-calendar-alt mr-1"></i>View All History
+                </button>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card text-center">
+        <div class="card-body">
+            <div class="empty-state">
+                <i class="fas fa-calendar-times text-muted" style="font-size: 3rem;"></i>
+                <h3 class="mt-3">No workout history found</h3>
+                <p class="text-muted">Start working out to see your history here!</p>
+                <a href="{{ url_for('gym.equipment_list') }}" class="btn btn-primary">
+                    <i class="fas fa-dumbbell me-1"></i> Browse Equipment
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterTabs = document.querySelectorAll('.history-filter-tab');
+        const dateGroups = document.querySelectorAll('.history-date-group');
+        const customDateCard = document.getElementById('custom-date-card');
+        const dateInput = document.getElementById('date-input');
+        const applyDateBtn = document.getElementById('apply-date');
+        const cancelDateBtn = document.getElementById('cancel-date');
+        const customDateBtn = document.getElementById('custom-date-btn');
+        const noResultsMessage = document.getElementById('no-results-message');
+        const historyTimeline = document.querySelector('.history-timeline');
+
+        const totalSessionsStat = document.getElementById('total-sessions-stat');
+        const totalTimeStat = document.getElementById('total-time-stat');
+        const caloriesStat = document.getElementById('calories-stat');
+        const mostUsedStat = document.getElementById('most-used-stat');
+
+        const today = new Date();
+        if (dateInput) {
+            dateInput.max = today.toISOString().split('T')[0];
+        }
+
+        const equipmentCalorieRates = {
+            'treadmill': 9.0,
+            'running': 9.0,
+            'elliptical': 10.0,
+            'cross': 10.0,
+            'bike': 6.4,
+            'spinning': 6.4,
+            'cycle': 6.4,
+            'leg press': 5.3,
+            'pulldown': 4.0,
+            'lat': 4.0,
+            'chest fly': 4.1,
+            'pec': 4.1,
+            'cable': 4.3
+        };
+
+        function getEquipmentCalorieRate(equipmentName) {
+            if (!equipmentName) return 5.0;
+
+            const nameLower = equipmentName.toLowerCase().trim();
+
+            for (const [keyword, rate] of Object.entries(equipmentCalorieRates)) {
+                if (nameLower.includes(keyword)) {
+                    return rate;
+                }
+            }
+
+            return 5.0;
+        }
+
+        function calculateCaloriesForReservation(equipmentName, durationMinutes) {
+            if (!equipmentName || durationMinutes <= 0) return 0;
+
+            const calorieRate = getEquipmentCalorieRate(equipmentName);
+            return Math.round(calorieRate * durationMinutes);
+        }
+
+        function calculateStats() {
+            let totalSessions = 0;
+            let totalMinutes = 0;
+            let totalCalories = 0;
+            let equipmentUsage = {};
+
+            dateGroups.forEach(group => {
+                if (group.style.display !== 'none') {
+                    const workoutItems = group.querySelectorAll('.workout-item');
+                    totalSessions += workoutItems.length;
+
+                    workoutItems.forEach(item => {
+                        const duration = parseInt(item.getAttribute('data-duration'));
+                        const equipment = item.getAttribute('data-equipment');
+
+                        totalMinutes += duration;
+
+                        const calories = calculateCaloriesForReservation(equipment, duration);
+                        totalCalories += calories;
+
+                        if (equipmentUsage[equipment]) {
+                            equipmentUsage[equipment] += duration;
+                        } else {
+                            equipmentUsage[equipment] = duration;
+                        }
+                    });
+                }
+            });
+
+            let mostUsedEquipment = 'N/A';
+            let maxUsage = 0;
+            for (const [equipment, usage] of Object.entries(equipmentUsage)) {
+                if (usage > maxUsage) {
+                    maxUsage = usage;
+                    mostUsedEquipment = equipment;
+                }
+            }
+
+            totalSessionsStat.textContent = totalSessions;
+            totalTimeStat.textContent = (totalMinutes / 60).toFixed(1) + 'h';
+            caloriesStat.textContent = totalCalories;
+            mostUsedStat.textContent = mostUsedEquipment;
+        }
+
+        window.resetToAllTime = function() {
+            const allTimeTab = document.querySelector('[data-filter="all"]');
+            if (allTimeTab) {
+                allTimeTab.click();
+            }
+        };
+
+        filterTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const filter = this.getAttribute('data-filter');
+
+                if (filter === 'custom') {
+                    customDateCard.style.display = 'block';
+                    customDateCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    return;
+                }
+
+                applyFilter(filter);
+            });
+        });
+
+        if (applyDateBtn) {
+            applyDateBtn.addEventListener('click', function() {
+                const selectedDate = dateInput.value;
+                if (selectedDate) {
+                    applyCustomDateFilter(selectedDate);
+                } else {
+                    alert('Please select a date first.');
+                }
+            });
+        }
+
+        if (cancelDateBtn) {
+            cancelDateBtn.addEventListener('click', function() {
+                customDateCard.style.display = 'none';
+                filterTabs.forEach(tab => tab.classList.remove('active'));
+                filterTabs[0].classList.add('active');
+                applyFilter('all');
+            });
+        }
+
+        function applyFilter(filter) {
+            filterTabs.forEach(tab => tab.classList.remove('active'));
+
+            if (customDateCard) customDateCard.style.display = 'none';
+
+            const targetTab = document.querySelector(`[data-filter="${filter}"]`);
+            if (targetTab) {
+                targetTab.classList.add('active');
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const weekStart = new Date(today);
+            const day = weekStart.getDay();
+            const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
+            weekStart.setDate(diff);
+
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+            let visibleCount = 0;
+            dateGroups.forEach(group => {
+                const groupDateStr = group.getAttribute('data-date');
+                const groupDate = new Date(groupDateStr + 'T00:00:00');
+                let show = true;
+
+                switch(filter) {
+                    case 'today':
+                        show = groupDate.getTime() === today.getTime();
+                        break;
+                    case 'week':
+                        show = groupDate >= weekStart && groupDate <= today;
+                        break;
+                    case 'month':
+                        show = groupDate >= monthStart && groupDate <= today;
+                        break;
+                    case 'all':
+                    default:
+                        show = true;
+                        break;
+                }
+
+                if (show) {
+                    group.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    group.style.display = 'none';
+                }
+            });
+
+            calculateStats();
+
+            if (visibleCount === 0 && filter !== 'all') {
+                if (historyTimeline) historyTimeline.style.display = 'none';
+                noResultsMessage.style.display = 'block';
+
+                const noResultsText = document.getElementById('no-results-text');
+                if (noResultsText) {
+                    switch(filter) {
+                        case 'today':
+                            noResultsText.textContent = 'No workouts found for today. Start exercising!';
+                            break;
+                        case 'week':
+                            noResultsText.textContent = 'No workouts found for this week.';
+                            break;
+                        case 'month':
+                            noResultsText.textContent = 'No workouts found for this month.';
+                            break;
+                        default:
+                            noResultsText.textContent = 'No workout history found for the selected date range.';
+                    }
+                }
+
+                totalSessionsStat.textContent = '0';
+                totalTimeStat.textContent = '0h';
+                caloriesStat.textContent = '0';
+                mostUsedStat.textContent = 'N/A';
+            } else {
+                if (historyTimeline) historyTimeline.style.display = 'block';
+                noResultsMessage.style.display = 'none';
+            }
+        }
+
+        function applyCustomDateFilter(selectedDate) {
+            filterTabs.forEach(tab => tab.classList.remove('active'));
+
+            if (customDateBtn) customDateBtn.classList.add('active');
+
+            customDateCard.style.display = 'none';
+
+            const targetDate = new Date(selectedDate + 'T00:00:00');
+            let foundDate = false;
+
+            dateGroups.forEach(group => {
+                const groupDateStr = group.getAttribute('data-date');
+                const groupDate = new Date(groupDateStr + 'T00:00:00');
+
+                if (groupDate.getTime() === targetDate.getTime()) {
+                    group.style.display = 'block';
+                    foundDate = true;
+                } else {
+                    group.style.display = 'none';
+                }
+            });
+
+            calculateStats();
+
+            if (!foundDate) {
+                if (historyTimeline) historyTimeline.style.display = 'none';
+                if (noResultsMessage) {
+                    noResultsMessage.style.display = 'block';
+                    const noResultsText = noResultsMessage.querySelector('#no-results-text');
+                    if (noResultsText) {
+                        const dateObj = new Date(selectedDate);
+                        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                        noResultsText.textContent = `No workouts found for ${dateObj.toLocaleDateString('en-US', options)}.`;
+                    }
+                }
+            } else {
+                if (historyTimeline) historyTimeline.style.display = 'block';
+                if (noResultsMessage) noResultsMessage.style.display = 'none';
+            }
+        }
+
+        applyFilter('all');
+    });
+</script>
+{% endblock %}
+
+{% block additional_styles %}
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: var(--transition);
+        text-align: center;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-info .stat-value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        line-height: 1;
+        margin-bottom: 5px;
+        transition: all 0.3s ease;
+    }
+
+    .stat-info .stat-title {
+        font-size: 0.9rem;
+        color: var(--gray-color);
+        font-weight: 500;
+    }
+
+    .history-filter-tabs {
+        display: flex;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        padding: 8px;
+        gap: 8px;
+        margin-bottom: 25px;
+        overflow-x: auto;
+    }
+
+    .history-filter-tab {
+        flex: 1;
+        min-width: 140px;
+        padding: 16px 20px;
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        text-align: left;
+    }
+
+    .history-filter-tab:hover {
+        background: #f8f9fa;
+        transform: translateY(-2px);
+    }
+
+    .history-filter-tab.active {
+        background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 0, 102, 0.2);
+    }
+
+    .history-filter-tab .tab-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 102, 0.1);
+        transition: var(--transition);
+    }
+
+    .history-filter-tab.active .tab-icon {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .history-filter-tab .tab-icon i {
+        font-size: 1.2rem;
+        color: var(--primary-color);
+    }
+
+    .history-filter-tab.active .tab-icon i {
+        color: white;
+    }
+
+    .history-filter-tab .tab-content {
+        flex: 1;
+    }
+
+    .history-filter-tab .tab-name {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 2px;
+        color: var(--dark-color);
+    }
+
+    .history-filter-tab.active .tab-name {
+        color: white;
+    }
+
+    .history-filter-tab .tab-desc {
+        font-size: 0.8rem;
+        color: var(--gray-color);
+        opacity: 0.8;
+    }
+
+    .history-filter-tab.active .tab-desc {
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .history-card {
+        margin-bottom: 20px;
+        border: none;
+        box-shadow: var(--shadow);
+        transition: var(--transition);
+    }
+
+    .history-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .history-card .card-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .date-info .card-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.3rem;
+        font-weight: 600;
+    }
+
+    .date-summary .badge {
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+
+    .workout-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        padding: 10px 0;
+    }
+
+    .workout-item {
+        background: #f8f9fa;
+        border-radius: var(--border-radius);
+        padding: 20px;
+        transition: var(--transition);
+        border-left: 4px solid var(--secondary-color);
+    }
+
+    .workout-item:hover {
+        background: #e9ecef;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .workout-details {
+        margin-bottom: 15px;
+    }
+
+    .workout-title {
+        margin: 0 0 12px 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+
+    .workout-time {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .time-badge, .duration-badge, .calorie-badge {
+        padding: 6px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: fit-content;
+    }
+
+    .time-badge {
+        background: #d1ecf1;
+        color: #0c5460;
+    }
+
+    .duration-badge {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .calorie-badge {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .workout-status {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+    .workout-status .badge {
+        padding: 8px 12px;
+        font-size: 0.85rem;
+    }
+
+    .no-results-state, .empty-state {
+        padding: 40px 20px;
+    }
+
+    .no-results-state h3, .empty-state h3 {
+        color: var(--dark-color);
+        margin-bottom: 15px;
+    }
+
+    .no-results-state p, .empty-state p {
+        color: var(--gray-color);
+        margin-bottom: 25px;
+    }
+
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        }
+
+        .history-filter-tabs {
+            flex-direction: column;
+            padding: 12px;
+        }
+
+        .history-filter-tab {
+            min-width: auto;
+            padding: 12px 16px;
+        }
+
+        .workout-grid {
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .date-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .history-filter-tabs {
+            gap: 6px;
+            padding: 8px;
+        }
+
+        .history-filter-tab {
+            padding: 10px 12px;
+            gap: 8px;
+        }
+
+        .workout-time {
+            gap: 5px;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-card {
+            padding: 15px;
+        }
+
+        .stat-info .stat-value {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}

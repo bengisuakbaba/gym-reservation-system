@@ -1,0 +1,317 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="scanner-container">
+    <h1>Equipment Scanner</h1>
+    <p class="scanner-info">Scan equipment QR code</p>
+
+    <div class="camera-view">
+        <video id="camera-video" class="camera" autoplay playsinline muted></video>
+        <canvas id="camera-canvas" style="display: none;"></canvas>
+
+        <div class="scanner-frame">
+            <div class="frame-corner top-left"></div>
+            <div class="frame-corner top-right"></div>
+            <div class="frame-corner bottom-left"></div>
+            <div class="frame-corner bottom-right"></div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="start-btn" class="start-button">Start Scanner</button>
+        <button id="stop-btn" class="stop-button" style="display: none;">Stop</button>
+    </div>
+
+    <div id="message" class="message"></div>
+
+    <div class="actions">
+        <a href="{{ url_for('gym.equipment_list') }}" class="back-link">View All Equipment</a>
+        <a href="{{ url_for('main.dashboard') }}" class="back-link">Back to Dashboard</a>
+    </div>
+</div>
+
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+class Scanner {
+    constructor() {
+        this.video = document.getElementById('camera-video');
+        this.canvas = document.getElementById('camera-canvas');
+        this.context = this.canvas.getContext('2d');
+        this.startBtn = document.getElementById('start-btn');
+        this.stopBtn = document.getElementById('stop-btn');
+        this.messageDiv = document.getElementById('message');
+
+        this.stream = null;
+        this.scanning = false;
+        this.animationId = null;
+
+        this.startBtn.addEventListener('click', () => this.start());
+        this.stopBtn.addEventListener('click', () => this.stop());
+    }
+
+    async start() {
+        try {
+            this.showMessage('Starting camera...');
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+
+            this.stream = stream;
+            this.video.srcObject = stream;
+
+            await new Promise(resolve => {
+                this.video.onloadedmetadata = resolve;
+            });
+
+            await this.video.play();
+
+            this.scanning = true;
+            this.scan();
+
+            this.startBtn.style.display = 'none';
+            this.stopBtn.style.display = 'block';
+            this.showMessage('Point camera at equipment QR code');
+
+        } catch (error) {
+            this.showMessage('Camera access denied');
+        }
+    }
+
+    stop() {
+        this.scanning = false;
+
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+
+        this.video.srcObject = null;
+
+        this.startBtn.style.display = 'block';
+        this.stopBtn.style.display = 'none';
+        this.showMessage('');
+    }
+
+    scan() {
+        if (!this.scanning) return;
+
+        if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+            this.canvas.width = this.video.videoWidth;
+            this.canvas.height = this.video.videoHeight;
+
+            this.context.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+
+            const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
+            const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+            if (code) {
+                this.handleQR(code.data);
+                return;
+            }
+        }
+
+        this.animationId = requestAnimationFrame(() => this.scan());
+    }
+
+    handleQR(data) {
+        if (this.isValidEquipment(data)) {
+            this.showMessage('Valid equipment! Redirecting...');
+            this.stop();
+
+            setTimeout(() => {
+                window.location.href = `/gym/equipment/${data}`;
+            }, 1000);
+        } else {
+            this.showMessage('Invalid equipment QR code');
+            setTimeout(() => {
+                if (this.scanning) this.scan();
+            }, 2000);
+        }
+    }
+
+    isValidEquipment(data) {
+        return data.startsWith('equipment_') ||
+               data.includes('treadmill') ||
+               data.includes('bench') ||
+               data.includes('squat') ||
+               data.includes('elliptical') ||
+               data.includes('rowing');
+    }
+
+    showMessage(text) {
+        this.messageDiv.textContent = text;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    new Scanner();
+});
+</script>
+{% endblock %}
+
+{% block additional_styles %}
+<style>
+    .scanner-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 20px;
+        text-align: center;
+    }
+
+    h1 {
+        color: #333;
+        margin-bottom: 10px;
+        font-size: 1.8rem;
+        font-weight: 600;
+    }
+
+    .scanner-info {
+        color: #666;
+        margin-bottom: 30px;
+        font-size: 1rem;
+    }
+
+    .camera-view {
+        position: relative;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 0 auto 30px;
+        max-width: 400px;
+        aspect-ratio: 4/3;
+    }
+
+    .camera {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .scanner-frame {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 200px;
+        height: 200px;
+        transform: translate(-50%, -50%);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+    }
+
+    .frame-corner {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #28a745;
+    }
+
+    .frame-corner.top-left {
+        top: -2px;
+        left: -2px;
+        border-right: none;
+        border-bottom: none;
+    }
+
+    .frame-corner.top-right {
+        top: -2px;
+        right: -2px;
+        border-left: none;
+        border-bottom: none;
+    }
+
+    .frame-corner.bottom-left {
+        bottom: -2px;
+        left: -2px;
+        border-right: none;
+        border-top: none;
+    }
+
+    .frame-corner.bottom-right {
+        bottom: -2px;
+        right: -2px;
+        border-left: none;
+        border-top: none;
+    }
+
+    .controls {
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    }
+
+    .start-button, .stop-button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .start-button:hover {
+        background: #0056b3;
+    }
+
+    .stop-button {
+        background: #dc3545;
+    }
+
+    .stop-button:hover {
+        background: #c82333;
+    }
+
+    .message {
+        min-height: 20px;
+        color: #666;
+        margin-bottom: 20px;
+        font-size: 0.9rem;
+    }
+
+    .actions {
+        margin-top: 20px;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .back-link {
+        color: #666;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+
+    .back-link:hover {
+        color: #333;
+        text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+        .scanner-container {
+            padding: 15px;
+        }
+
+        .camera-view {
+            max-width: 100%;
+        }
+
+        .scanner-frame {
+            width: 160px;
+            height: 160px;
+        }
+
+        .actions {
+            flex-direction: column;
+            gap: 10px;
+        }
+    }
+</style>
+{% endblock %}

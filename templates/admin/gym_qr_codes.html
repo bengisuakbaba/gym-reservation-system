@@ -1,0 +1,100 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="gym-qr-container">
+    <h1>Gym QR Codes</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="qr-cards">
+        <div class="qr-card">
+            <h2>Gym Entry QR Code</h2>
+            <div class="qr-image">
+                <img src="{{ url_for('static', filename='qrcodes/' + entry_qr + '.png') }}" alt="Gym Entry QR Code">
+            </div>
+        </div>
+
+        <div class="qr-card">
+            <h2>Gym Exit QR Code</h2>
+            <div class="qr-image">
+                <img src="{{ url_for('static', filename='qrcodes/' + exit_qr + '.png') }}" alt="Gym Exit QR Code">
+            </div>
+        </div>
+    </div>
+
+    <div class="back-link">
+        <a href="{{ url_for('admin.admin_dashboard') }}">Back to Admin Dashboard</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block additional_styles %}
+<style>
+    .gym-qr-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .gym-qr-container h1 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: var(--secondary-color);
+    }
+
+    .qr-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .qr-card {
+        background-color: white;
+        border-radius: 6px;
+        padding: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+
+    .qr-card h2 {
+        color: var(--secondary-color);
+        margin-bottom: 15px;
+        font-size: 1.4rem;
+    }
+
+    .qr-image {
+        margin-bottom: 15px;
+    }
+
+    .qr-image img {
+        max-width: 200px;
+        height: auto;
+        border: 1px solid #ddd;
+        padding: 10px;
+        background-color: white;
+    }
+
+    .back-link {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .back-link a {
+        color: var(--secondary-color);
+        text-decoration: none;
+    }
+
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,233 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="admin-users-container">
+    <h1>Manage Users</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="search-bar">
+        <input type="text" id="user-search" placeholder="Search users by name, email, or student ID...">
+        <button id="search-btn"><i class="fas fa-search"></i></button>
+    </div>
+
+    <div class="users-table-container">
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Student ID</th>
+                    <th>Joined</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.first_name }} {{ user.last_name }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>{{ user.get_student_id() }}</td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                        <td>
+                            <span class="status-badge active">Active</span>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="no-data">No users found.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="user-stats">
+        <div class="stat-item">
+            <span class="stat-label">Total Users:</span>
+            <span class="stat-value">{{ users|length }}</span>
+        </div>
+    </div>
+
+    <div class="back-link">
+        <a href="{{ url_for('admin.admin_dashboard') }}">Back to Admin Dashboard</a>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('user-search');
+        const searchBtn = document.getElementById('search-btn');
+        const tableRows = document.querySelectorAll('.users-table tbody tr');
+
+        function filterTable() {
+            const searchTerm = searchInput.value.toLowerCase();
+
+            tableRows.forEach(row => {
+                if (row.classList.contains('no-data')) return;
+
+                const name = row.cells[1].textContent.toLowerCase();
+                const email = row.cells[2].textContent.toLowerCase();
+                const studentId = row.cells[3].textContent.toLowerCase();
+
+                if (name.includes(searchTerm) || email.includes(searchTerm) || studentId.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        searchInput.addEventListener('keyup', filterTable);
+        searchBtn.addEventListener('click', filterTable);
+    });
+</script>
+{% endblock %}
+
+{% block additional_styles %}
+<style>
+    .admin-users-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .admin-users-container h1 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: var(--secondary-color);
+    }
+
+    .search-bar {
+        display: flex;
+        max-width: 500px;
+        margin: 0 auto 20px;
+    }
+
+    .search-bar input {
+        flex-grow: 1;
+        padding: 10px 15px;
+        border: 1px solid #ddd;
+        border-right: none;
+        border-top-left-radius: 4px;
+        border-bottom-left-radius: 4px;
+        font-size: 1rem;
+    }
+
+    .search-bar button {
+        background-color: var(--secondary-color);
+        color: white;
+        border: none;
+        padding: 0 15px;
+        cursor: pointer;
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+    }
+
+    .users-table-container {
+        background-color: white;
+        border-radius: 6px;
+        padding: 20px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        overflow-x: auto;
+        margin-bottom: 20px;
+    }
+
+    .users-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .users-table th {
+        background-color: #f5f5f5;
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 2px solid #ddd;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .users-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .users-table tbody tr:hover {
+        background-color: #f9f9f9;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+
+    .status-badge.active {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge.inactive {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 20px !important;
+        color: #666;
+    }
+
+    .user-stats {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .stat-item {
+        background-color: white;
+        border-radius: 4px;
+        padding: 10px 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .stat-label {
+        font-weight: bold;
+        color: #555;
+        margin-right: 5px;
+    }
+
+    .stat-value {
+        font-weight: bold;
+        color: var(--secondary-color);
+    }
+
+    .back-link {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .back-link a {
+        color: var(--secondary-color);
+        text-decoration: none;
+    }
+
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
